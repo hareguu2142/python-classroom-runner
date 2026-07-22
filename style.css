@@ -16,7 +16,7 @@
 
 * { box-sizing: border-box; }
 
-html { min-width: 320px; background: var(--bg); }
+html { min-width: 320px; background: var(--bg); font-size: 16px; }
 
 body {
   min-height: 100vh;
@@ -45,6 +45,41 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visi
   width: min(1400px, calc(100% - 40px));
   margin: 0 auto;
   padding: 22px 0;
+}
+
+.header-tools { display: flex; gap: 10px; align-items: center; }
+
+.font-size-control {
+  display: inline-flex;
+  overflow: hidden;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgb(17 24 42 / 75%);
+}
+
+.font-size-control button {
+  min-width: 38px;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  font-size: .75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.font-size-control button:hover:not(:disabled) { background: rgb(255 255 255 / 7%); }
+.font-size-control button:disabled { cursor: not-allowed; opacity: .35; }
+.font-size-control output {
+  display: grid;
+  min-width: 48px;
+  padding: 7px 4px;
+  place-items: center;
+  border-right: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+  font-size: .7rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .brand {
@@ -193,7 +228,7 @@ main {
   padding: 20px 13px 20px 8px;
   color: #5f6d88;
   background: #0d1425;
-  font: 14px/1.7 Consolas, "Cascadia Code", monospace;
+  font: .875rem/1.7 Consolas, "Cascadia Code", monospace;
   text-align: right;
   user-select: none;
   white-space: normal;
@@ -201,7 +236,7 @@ main {
 
 .line-number {
   display: block;
-  height: 23.8px;
+  height: 1.7em;
   border-right: 2px solid transparent;
   border-radius: 3px 0 0 3px;
   transition: color .12s ease, background .12s ease;
@@ -230,7 +265,7 @@ main {
   font-family: Consolas, "Cascadia Code", monospace;
 }
 
-#code-editor { min-height: 480px; padding: 20px; outline-offset: -3px; font-size: 14px; line-height: 1.7; tab-size: 4; }
+#code-editor { min-height: 480px; padding: 20px; outline-offset: -3px; font-size: .875rem; line-height: 1.7; tab-size: 4; }
 .keyboard-hint { padding: 8px 16px; border-top: 1px solid var(--border); color: #6f7d99; background: #0d1425; font-size: .7rem; text-align: right; }
 kbd { padding: 1px 4px; border: 1px solid #394660; border-radius: 4px; color: #9fabc1; background: #182137; font-family: inherit; }
 
@@ -239,7 +274,7 @@ kbd { padding: 1px 4px; border: 1px solid #394660; border-radius: 4px; color: #9
 .debug-content { height: calc(100% - 50px); min-height: 0; padding: 14px 16px; background: #0d1425; }
 .debug-summary { display: flex; justify-content: space-between; margin-bottom: 12px; color: #8594b0; font-size: .72rem; }
 .debug-summary span:first-child { color: #b8d8ff; font-weight: 800; }
-.variables { overflow: auto; max-height: 150px; border-top: 1px solid rgb(39 50 74 / 65%); padding-top: 9px; font: 12px/1.55 Consolas, "Cascadia Code", monospace; }
+.variables { overflow: auto; max-height: 150px; border-top: 1px solid rgb(39 50 74 / 65%); padding-top: 9px; font: .75rem/1.55 Consolas, "Cascadia Code", monospace; }
 .variable-row { display: grid; grid-template-columns: minmax(70px, .5fr) minmax(0, 1fr); gap: 10px; padding: 4px 2px; border-bottom: 1px solid rgb(39 50 74 / 35%); }
 .variable-name { overflow: hidden; color: #7eb8ff; text-overflow: ellipsis; white-space: nowrap; }
 .variable-value { overflow: hidden; color: #d9e4fa; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
@@ -257,7 +292,7 @@ kbd { padding: 1px 4px; border: 1px solid #394660; border-radius: 4px; color: #9
   padding: 18px;
   color: #d9e4fa;
   background: #090f1c;
-  font: 13px/1.65 Consolas, "Cascadia Code", monospace;
+  font: .8125rem/1.65 Consolas, "Cascadia Code", monospace;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -274,7 +309,7 @@ kbd { padding: 1px 4px; border: 1px solid #394660; border-radius: 4px; color: #9
 
 .terminal-input[hidden] { display: none; }
 .terminal-chevron { color: var(--accent); font: 800 20px Consolas, monospace; }
-.terminal-input input { min-width: 0; flex: 1; padding: 8px 10px; border: 1px solid #34547d; border-radius: 7px; outline: none; color: #f1f6ff; background: #0a1120; font: 13px Consolas, "Cascadia Code", monospace; }
+.terminal-input input { min-width: 0; flex: 1; padding: 8px 10px; border: 1px solid #34547d; border-radius: 7px; outline: none; color: #f1f6ff; background: #0a1120; font: .8125rem Consolas, "Cascadia Code", monospace; }
 .terminal-input input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb(77 159 255 / 12%); }
 .terminal-input button { padding: 8px 12px; border: 0; border-radius: 7px; color: #102039; background: var(--blue); font-size: .75rem; font-weight: 900; cursor: pointer; }
 
@@ -310,6 +345,7 @@ footer a { color: #8f9cb5; text-decoration: none; }
 @media (max-width: 580px) {
   .site-header, main, footer { width: min(100% - 24px, 1400px); }
   .site-header { align-items: flex-start; }
+  .header-tools { align-items: flex-end; flex-direction: column-reverse; }
   .brand small { display: none; }
   .runtime-state { padding: 7px 9px; }
   .hero { padding-top: 24px; }

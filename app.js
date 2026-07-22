@@ -1,5 +1,9 @@
 const PYODIDE_VERSION = "0.29.3";
 const STORAGE_KEY = "python-classroom-runner:code";
+const FONT_SIZE_STORAGE_KEY = "python-classroom-runner:font-size";
+const DEFAULT_FONT_SIZE = 16;
+const MIN_FONT_SIZE = 14;
+const MAX_FONT_SIZE = 20;
 
 const examples = {
   hello: `# 첫 번째 Python 프로그램\nname = "파이썬 교실"\nprint(f"안녕하세요, {name}!")\nprint("3 + 4 =", 3 + 4)`,
@@ -28,12 +32,16 @@ const debugStepCount = document.querySelector("#debug-step-count");
 const variables = document.querySelector("#variables");
 const terminalInputForm = document.querySelector("#terminal-input");
 const terminalInputValue = document.querySelector("#terminal-input-value");
+const fontSizeDecrease = document.querySelector("#font-size-decrease");
+const fontSizeIncrease = document.querySelector("#font-size-increase");
+const fontSizeValue = document.querySelector("#font-size-value");
 
 let worker;
 let workerReady = false;
 let running = false;
 let waitingForInput = false;
 let startedAt = 0;
+let fontSize = getSavedFontSize();
 
 let session = freshSession("");
 
@@ -46,6 +54,23 @@ function freshSession(code) {
     request: null,
     complete: false,
   };
+}
+
+function getSavedFontSize() {
+  const savedSize = Number.parseInt(localStorage.getItem(FONT_SIZE_STORAGE_KEY), 10);
+  return Number.isFinite(savedSize)
+    ? Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, savedSize))
+    : DEFAULT_FONT_SIZE;
+}
+
+function applyFontSize(nextSize) {
+  fontSize = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, nextSize));
+  document.documentElement.style.fontSize = `${fontSize}px`;
+  fontSizeValue.textContent = `${Math.round(fontSize / DEFAULT_FONT_SIZE * 100)}%`;
+  fontSizeDecrease.disabled = fontSize === MIN_FONT_SIZE;
+  fontSizeIncrease.disabled = fontSize === MAX_FONT_SIZE;
+  localStorage.setItem(FONT_SIZE_STORAGE_KEY, String(fontSize));
+  updateLineNumbers();
 }
 
 function createWorker() {
@@ -287,7 +312,7 @@ function updateLineNumbers() {
 
 function revealLine(line) {
   if (!line) return;
-  const lineHeight = 23.8;
+  const lineHeight = Number.parseFloat(getComputedStyle(codeEditor).lineHeight);
   const targetTop = (line - 1) * lineHeight;
   const visibleTop = codeEditor.scrollTop;
   const visibleBottom = visibleTop + codeEditor.clientHeight - lineHeight;
@@ -388,6 +413,8 @@ backButton.addEventListener("click", stepBack);
 resetButton.addEventListener("click", () => loadExample("hello"));
 exampleSelect.addEventListener("change", () => loadExample(exampleSelect.value));
 terminalInputForm.addEventListener("submit", submitTerminalInput);
+fontSizeDecrease.addEventListener("click", () => applyFontSize(fontSize - 1));
+fontSizeIncrease.addEventListener("click", () => applyFontSize(fontSize + 1));
 
 copyButton.addEventListener("click", async () => {
   try {
@@ -401,6 +428,7 @@ copyButton.addEventListener("click", async () => {
 
 codeEditor.value = localStorage.getItem(STORAGE_KEY) ?? examples.hello;
 session = freshSession(codeEditor.value.trimEnd());
+applyFontSize(fontSize);
 updateLineNumbers();
 renderVariables([]);
 createWorker();
