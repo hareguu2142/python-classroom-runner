@@ -1,6 +1,7 @@
 let pyodide;
 let initialized = false;
 let busy = false;
+let mountedTextFileNames = new Set();
 
 const PYTHON_RUNNER = String.raw`
 import builtins as _builtins
@@ -171,7 +172,7 @@ self.addEventListener("message", async ({ data }) => {
   }
 
   if (data.type === "execute" && initialized && !busy) {
-    await execute(data.code, data.inputs, data.request);
+    await execute(data.code, data.inputs, data.request, data.files);
   }
 });
 
@@ -188,12 +189,14 @@ async function initialize(version) {
   }
 }
 
-async function execute(code, inputs = [], request = { mode: "full" }) {
+async function execute(code, inputs = [], request = { mode: "full" }, files = []) {
   busy = true;
   try {
     self.postMessage({ type: "status", message: "필요한 패키지 확인 중…" });
     await pyodide.loadPackagesFromImports(code);
     self.postMessage({ type: "status", message: "코드 실행 중…" });
+
+    mountTextFiles(files);
 
     pyodide.globals.set("__runner_code", code);
     pyodide.globals.set("__runner_inputs_json", JSON.stringify(inputs));
@@ -207,6 +210,30 @@ async function execute(code, inputs = [], request = { mode: "full" }) {
   } finally {
     busy = false;
   }
+}
+
+function mountTextFiles(files) {
+  for (const fileName of mountedTextFileNames) {
+    try {
+      pyodide.FS.unlink(fileName);
+    } catch {
+      // 학생 코드가 파일을 지웠거나 옮긴 경우에는 이미 없는 상태입니다.
+    }
+  }
+
+  const nextFileNames = new Set();
+  for (const file of files || []) {
+    const fileName = safeTextFileName(file?.name);
+    if (!fileName) continue;
+    pyodide.FS.writeFile(fileName, String(file.content ?? ""), { encoding: "utf8" });
+    nextFileNames.add(fileName);
+  }
+  mountedTextFileNames = nextFileNames;
+}
+
+function safeTextFileName(value) {
+  const fileName = String(value ?? "").replaceAll("\\", "/").split("/").pop().replaceAll("\0", "");
+  return fileName && fileName.toLowerCase().endsWith(".txt") ? fileName : "";
 }
 
 function formatError(error) {

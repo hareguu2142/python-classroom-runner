@@ -6,7 +6,7 @@
   <meta name="description" content="설치 없이 브라우저에서 바로 실행하는 수업용 Python 실습기">
   <title>파이썬 교실</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="stylesheet" href="./style.css?v=3">
+  <link rel="stylesheet" href="./style.css?v=4">
 </head>
 <body>
   <header class="site-header">
@@ -44,6 +44,7 @@
           <option value="loop">반복문</option>
           <option value="function">함수</option>
           <option value="input">입력받기</option>
+          <option value="read">TXT 파일 읽기</option>
         </select>
       </label>
     </section>
@@ -56,6 +57,8 @@
             <span>main.py</span>
           </div>
           <div class="editor-actions">
+            <button class="button button-file" id="file-button" type="button">TXT 불러오기</button>
+            <input id="file-input" type="file" accept=".txt,text/plain" multiple hidden>
             <button class="button button-ghost" id="reset-button" type="button">초기화</button>
             <button class="button button-debug" id="back-button" type="button" disabled title="직전 실행 지점으로 되돌리기 (Shift+F10)">↶ 되돌리기</button>
             <button class="button button-debug" id="step-button" type="button" disabled title="한 줄 실행 (F10)">↓ 한 줄</button>
@@ -65,6 +68,10 @@
               <span aria-hidden="true">▶</span> 전체 실행
             </button>
           </div>
+        </div>
+        <div class="file-shelf" aria-live="polite">
+          <span class="file-shelf-label">읽을 파일</span>
+          <div class="loaded-files" id="loaded-files"><span class="muted">불러온 TXT 파일이 없습니다.</span></div>
         </div>
         <div class="editor-wrap">
           <div class="line-numbers" id="line-numbers" aria-hidden="true">1</div>
@@ -109,7 +116,7 @@
       </div>
     </section>
 
-    <p class="privacy-note">코드는 이 기기에만 자동 저장됩니다. 되돌리기는 실행 이력을 처음부터 재생하므로 파일·네트워크·난수처럼 외부 상태를 바꾸는 코드는 결과가 달라질 수 있습니다.</p>
+    <p class="privacy-note">코드와 불러온 TXT 파일은 서버로 전송되지 않습니다. TXT 파일은 새로고침하면 사라집니다. 되돌리기는 실행 이력을 처음부터 재생하므로 파일 쓰기·네트워크·난수처럼 외부 상태를 바꾸는 코드는 결과가 달라질 수 있습니다.</p>
   </main>
 
   <footer>
@@ -117,6 +124,6 @@
     <a href="https://pyodide.org/" target="_blank" rel="noreferrer">Pyodide 알아보기 ↗</a>
   </footer>
 
-  <script type="module" src="./app.js?v=3"></script>
+  <script type="module" src="./app.js?v=4"></script>
 </body>
 </html>

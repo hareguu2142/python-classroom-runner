@@ -4,12 +4,14 @@ const FONT_SIZE_STORAGE_KEY = "python-classroom-runner:font-size";
 const DEFAULT_FONT_SIZE = 16;
 const MIN_FONT_SIZE = 14;
 const MAX_FONT_SIZE = 20;
+const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
 
 const examples = {
   hello: `# 첫 번째 Python 프로그램\nname = "파이썬 교실"\nprint(f"안녕하세요, {name}!")\nprint("3 + 4 =", 3 + 4)`,
   loop: `# 1부터 10까지 짝수의 합\ntotal = 0\n\nfor number in range(1, 11):\n    if number % 2 == 0:\n        print("짝수:", number)\n        total += number\n\nprint("합계:", total)`,
   function: `# 함수 안으로도 한 줄씩 들어갈 수 있습니다\ndef celsius_to_fahrenheit(celsius):\n    result = celsius * 9 / 5 + 32\n    return result\n\nfor temperature in [0, 10, 25]:\n    converted = celsius_to_fahrenheit(temperature)\n    print(f"{temperature}°C → {converted:.1f}°F")`,
   input: `# input()을 만나면 터미널 입력창이 나타납니다\nname = input("이름: ")\nage = int(input("나이: "))\n\nprint(f"반가워요, {name}님!")\nprint(f"내년에는 {age + 1}살이 됩니다.")`,
+  read: `# 먼저 [TXT 불러오기]로 sample.txt 파일을 선택하세요\nwith open("sample.txt", "r", encoding="utf-8") as file:\n    content = file.read()\n\nprint(content)`,
 };
 
 const codeEditor = document.querySelector("#code-editor");
@@ -35,6 +37,9 @@ const terminalInputValue = document.querySelector("#terminal-input-value");
 const fontSizeDecrease = document.querySelector("#font-size-decrease");
 const fontSizeIncrease = document.querySelector("#font-size-increase");
 const fontSizeValue = document.querySelector("#font-size-value");
+const fileButton = document.querySelector("#file-button");
+const fileInput = document.querySelector("#file-input");
+const loadedFilesElement = document.querySelector("#loaded-files");
 
 let worker;
 let workerReady = false;
@@ -42,6 +47,7 @@ let running = false;
 let waitingForInput = false;
 let startedAt = 0;
 let fontSize = getSavedFontSize();
+const loadedTextFiles = new Map();
 
 let session = freshSession("");
 
@@ -77,7 +83,7 @@ function createWorker() {
   workerReady = false;
   setRuntimeState("loading", "Python 준비 중…");
   updateControls();
-  worker = new Worker("./python-worker.js?v=2", { type: "module" });
+  worker = new Worker("./python-worker.js?v=3", { type: "module" });
 
   worker.addEventListener("message", handleWorkerMessage);
   worker.addEventListener("error", (event) => {
@@ -221,6 +227,7 @@ function startExecution(request, resume = false) {
     code,
     inputs: session.inputs,
     request,
+    files: Array.from(loadedTextFiles, ([name, content]) => ({ name, content })),
   });
 }
 
@@ -354,12 +361,21 @@ function updateControls() {
   stopButton.disabled = !running && !waitingForInput;
   resetButton.disabled = running || waitingForInput;
   exampleSelect.disabled = running || waitingForInput;
+  fileButton.disabled = running || waitingForInput;
+  fileInput.disabled = running || waitingForInput;
+  loadedFilesElement.querySelectorAll(".file-remove").forEach((button) => {
+    button.disabled = running || waitingForInput;
+  });
   codeEditor.readOnly = running || waitingForInput;
 }
 
 function loadExample(name, force = false) {
-  const example = examples[name];
+  let example = examples[name];
   if (!example) return;
+  if (name === "read" && loadedTextFiles.size) {
+    const fileName = loadedTextFiles.keys().next().value;
+    example = `# 불러온 TXT 파일을 read()로 읽습니다\nwith open(${JSON.stringify(fileName)}, "r", encoding="utf-8") as file:\n    content = file.read()\n\nprint(content)`;
+  }
   if (!force && codeEditor.value.trim() && !window.confirm("작성 중인 코드를 예제로 바꿀까요?")) {
     exampleSelect.value = "";
     return;
@@ -372,6 +388,78 @@ function loadExample(name, force = false) {
 
 function saveDraft() {
   localStorage.setItem(STORAGE_KEY, codeEditor.value);
+}
+
+async function loadTextFiles() {
+  const selectedFiles = Array.from(fileInput.files || []);
+  fileInput.value = "";
+  if (!selectedFiles.length) return;
+
+  const errors = [];
+  let loadedCount = 0;
+
+  for (const file of selectedFiles) {
+    const fileName = file.name.replaceAll("\\", "/").split("/").pop().replaceAll("\0", "");
+    if (!fileName.toLowerCase().endsWith(".txt")) {
+      errors.push(`${file.name}: TXT 파일만 불러올 수 있습니다.`);
+      continue;
+    }
+    if (file.size > MAX_TEXT_FILE_SIZE) {
+      errors.push(`${fileName}: 파일 크기는 5MB 이하여야 합니다.`);
+      continue;
+    }
+
+    try {
+      loadedTextFiles.set(fileName, await file.text());
+      loadedCount += 1;
+    } catch {
+      errors.push(`${fileName}: 파일을 읽지 못했습니다.`);
+    }
+  }
+
+  renderLoadedFiles();
+  resetDebugSession(codeEditor.value.trimEnd(), false);
+
+  const messages = [];
+  if (loadedCount) {
+    messages.push(`${loadedCount}개의 TXT 파일을 불러왔습니다. Python에서 open("파일명.txt").read()로 읽을 수 있습니다.`);
+  }
+  messages.push(...errors);
+  showOutput(messages.join("\n"), errors.length > 0 && loadedCount === 0);
+}
+
+function renderLoadedFiles() {
+  loadedFilesElement.replaceChildren();
+  if (!loadedTextFiles.size) {
+    const emptyMessage = document.createElement("span");
+    emptyMessage.className = "muted";
+    emptyMessage.textContent = "불러온 TXT 파일이 없습니다.";
+    loadedFilesElement.append(emptyMessage);
+    updateControls();
+    return;
+  }
+
+  for (const fileName of loadedTextFiles.keys()) {
+    const chip = document.createElement("span");
+    chip.className = "file-chip";
+
+    const name = document.createElement("span");
+    name.className = "file-chip-name";
+    name.textContent = fileName;
+    name.title = fileName;
+
+    const removeButton = document.createElement("button");
+    removeButton.className = "file-remove";
+    removeButton.type = "button";
+    removeButton.dataset.fileName = fileName;
+    removeButton.title = `${fileName} 제거`;
+    removeButton.setAttribute("aria-label", `${fileName} 제거`);
+    removeButton.textContent = "×";
+
+    chip.append(name, removeButton);
+    loadedFilesElement.append(chip);
+  }
+  updateControls();
 }
 
 codeEditor.addEventListener("input", () => {
@@ -412,6 +500,16 @@ cursorButton.addEventListener("click", runToCursor);
 backButton.addEventListener("click", stepBack);
 resetButton.addEventListener("click", () => loadExample("hello"));
 exampleSelect.addEventListener("change", () => loadExample(exampleSelect.value));
+fileButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", loadTextFiles);
+loadedFilesElement.addEventListener("click", (event) => {
+  const removeButton = event.target.closest(".file-remove");
+  if (!removeButton || running || waitingForInput) return;
+  loadedTextFiles.delete(removeButton.dataset.fileName);
+  renderLoadedFiles();
+  resetDebugSession(codeEditor.value.trimEnd(), false);
+  showOutput("TXT 파일을 제거했습니다.");
+});
 terminalInputForm.addEventListener("submit", submitTerminalInput);
 fontSizeDecrease.addEventListener("click", () => applyFontSize(fontSize - 1));
 fontSizeIncrease.addEventListener("click", () => applyFontSize(fontSize + 1));
