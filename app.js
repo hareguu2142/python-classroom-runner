@@ -52,7 +52,7 @@ function createWorker() {
   workerReady = false;
   setRuntimeState("loading", "Python 준비 중…");
   updateControls();
-  worker = new Worker("./python-worker.js", { type: "module" });
+  worker = new Worker("./python-worker.js?v=2", { type: "module" });
 
   worker.addEventListener("message", handleWorkerMessage);
   worker.addEventListener("error", (event) => {
