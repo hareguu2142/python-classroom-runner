@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="설치 없이 브라우저에서 바로 실행하는 수업용 Python 실습기">
+  <title>파이썬 교실</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="파이썬 교실 홈">
+      <span class="brand-mark" aria-hidden="true">Py</span>
+      <span>
+        <strong>파이썬 교실</strong>
+        <small>브라우저에서 바로 배우는 Python</small>
+      </span>
+    </a>
+    <div class="runtime-state" id="runtime-state" data-state="loading" aria-live="polite">
+      <span class="state-dot"></span>
+      <span id="runtime-label">Python 준비 중…</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">설치 없이 시작하기</p>
+        <h1>코드를 쓰고, 바로 확인하세요.</h1>
+        <p>학생의 브라우저 안에서 Python이 실행됩니다. 작성한 코드는 서버로 전송되지 않습니다.</p>
+      </div>
+      <label class="example-picker">
+        <span>예제 불러오기</span>
+        <select id="example-select" aria-label="예제 코드 선택">
+          <option value="hello">첫 번째 프로그램</option>
+          <option value="loop">반복문</option>
+          <option value="function">함수</option>
+          <option value="input">입력받기</option>
+        </select>
+      </label>
+    </section>
+
+    <section class="workspace" aria-label="Python 코드 실습기">
+      <article class="panel editor-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="file-icon" aria-hidden="true">⌁</span>
+            <span>main.py</span>
+          </div>
+          <div class="editor-actions">
+            <button class="button button-ghost" id="reset-button" type="button">초기화</button>
+            <button class="button button-stop" id="stop-button" type="button" disabled>■ 중지</button>
+            <button class="button button-run" id="run-button" type="button" disabled>
+              <span aria-hidden="true">▶</span> 실행
+            </button>
+          </div>
+        </div>
+        <div class="editor-wrap">
+          <div class="line-numbers" id="line-numbers" aria-hidden="true">1</div>
+          <textarea id="code-editor" aria-label="Python 코드 입력" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        </div>
+        <div class="keyboard-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd>로 실행</div>
+      </article>
+
+      <div class="side-column">
+        <article class="panel input-panel">
+          <div class="panel-header compact">
+            <div class="panel-title"><span aria-hidden="true">⌨</span><span>입력값</span></div>
+            <span class="panel-help">input() 호출 순서대로 한 줄씩</span>
+          </div>
+          <textarea id="stdin-editor" aria-label="프로그램 입력값" placeholder="예:&#10;홍길동&#10;15" spellcheck="false"></textarea>
+        </article>
+
+        <article class="panel output-panel">
+          <div class="panel-header compact">
+            <div class="panel-title"><span aria-hidden="true">›_</span><span>실행 결과</span></div>
+            <div class="output-meta">
+              <span id="elapsed-time"></span>
+              <button class="icon-button" id="copy-button" type="button" title="결과 복사" aria-label="실행 결과 복사">복사</button>
+            </div>
+          </div>
+          <pre id="output" tabindex="0" aria-live="polite"><span class="muted">실행 버튼을 누르면 결과가 여기에 표시됩니다.</span></pre>
+        </article>
+      </div>
+    </section>
+
+    <p class="privacy-note">코드는 이 기기에만 자동 저장됩니다. 새로고침해도 이어서 작성할 수 있어요.</p>
+  </main>
+
+  <footer>
+    <span>Python powered by Pyodide</span>
+    <a href="https://pyodide.org/" target="_blank" rel="noreferrer">Pyodide 알아보기 ↗</a>
+  </footer>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
