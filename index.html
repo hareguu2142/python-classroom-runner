@@ -6,7 +6,8 @@
   <meta name="description" content="설치 없이 브라우저에서 바로 실행하는 수업용 Python 실습기">
   <title>파이썬 교실</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link rel="stylesheet" href="./style.css?v=4">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+  <link rel="stylesheet" href="./style.css?v=5">
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +41,7 @@
       <label class="example-picker">
         <span>예제 불러오기</span>
         <select id="example-select" aria-label="예제 코드 선택">
+          <option value="" disabled selected>예제를 고르세요</option>
           <option value="hello">첫 번째 프로그램</option>
           <option value="loop">반복문</option>
           <option value="function">함수</option>
@@ -54,30 +56,39 @@
         <div class="panel-header">
           <div class="panel-title">
             <span class="file-icon" aria-hidden="true">⌁</span>
-            <span>main.py</span>
+            <span id="file-name">main.py</span>
           </div>
           <div class="editor-actions">
-            <button class="button button-file" id="file-button" type="button">TXT 불러오기</button>
-            <input id="file-input" type="file" accept=".txt,text/plain" multiple hidden>
-            <button class="button button-ghost" id="reset-button" type="button">초기화</button>
-            <button class="button button-debug" id="back-button" type="button" disabled title="직전 실행 지점으로 되돌리기 (Shift+F10)">↶ 되돌리기</button>
-            <button class="button button-debug" id="step-button" type="button" disabled title="한 줄 실행 (F10)">↓ 한 줄</button>
-            <button class="button button-debug" id="cursor-button" type="button" disabled title="커서가 있는 줄까지 실행 (Ctrl+F10)">⇥ 커서까지</button>
+            <button class="button button-debug" id="back-button" type="button" disabled title="한 줄 뒤로 (Shift+F10 또는 Alt+↑)">↶ 한 줄 뒤로</button>
+            <button class="button button-debug" id="step-button" type="button" disabled title="한 줄 실행 (F10 또는 Alt+↓)">↓ 한 줄</button>
+            <button class="button button-debug" id="cursor-button" type="button" disabled title="커서가 있는 줄까지 실행 (Ctrl+F10 또는 Alt+→)">⇥ 커서까지</button>
             <button class="button button-stop" id="stop-button" type="button" disabled>■ 중지</button>
-            <button class="button button-run" id="run-button" type="button" disabled>
+            <button class="button button-run" id="run-button" type="button" disabled title="전체 실행 (Ctrl+Enter)">
               <span aria-hidden="true">▶</span> 전체 실행
             </button>
           </div>
         </div>
-        <div class="file-shelf" aria-live="polite">
-          <span class="file-shelf-label">읽을 파일</span>
-          <div class="loaded-files" id="loaded-files"><span class="muted">불러온 TXT 파일이 없습니다.</span></div>
+        <div class="file-shelf">
+          <div class="file-shelf-files" aria-live="polite">
+            <span class="file-shelf-label">읽을 파일</span>
+            <div class="loaded-files" id="loaded-files"><span class="muted">불러온 TXT 파일이 없습니다.</span></div>
+          </div>
+          <div class="file-actions">
+            <button class="button button-small button-file" id="file-button" type="button" title="Python 코드에서 open()으로 읽을 TXT 파일을 불러옵니다">TXT 불러오기</button>
+            <input id="file-input" type="file" accept=".txt,text/plain" multiple hidden>
+            <button class="button button-small button-ghost" id="open-button" type="button" title="내 컴퓨터의 .py 파일을 편집기로 엽니다">열기</button>
+            <input id="py-file-input" type="file" accept=".py,text/x-python" hidden>
+            <button class="button button-small button-ghost" id="save-button" type="button" title="지금 코드를 .py 파일로 내려받습니다">.py 저장</button>
+            <button class="button button-small button-ghost" id="reset-button" type="button" title="편집기를 첫 번째 예제 코드로 바꿉니다">처음 코드로</button>
+          </div>
         </div>
         <div class="editor-wrap">
-          <div class="line-numbers" id="line-numbers" aria-hidden="true">1</div>
           <textarea id="code-editor" aria-label="Python 코드 입력" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
         </div>
-        <div class="keyboard-hint"><kbd>F10</kbd> 한 줄 · <kbd>Ctrl</kbd> + <kbd>F10</kbd> 커서까지 · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> 전체 실행</div>
+        <div class="editor-footer">
+          <span class="save-status" id="save-status">브라우저에 자동 저장됩니다</span>
+          <span class="keyboard-hint"><kbd>F10</kbd>/<kbd>Alt</kbd>+<kbd>↓</kbd> 한 줄 · <kbd>Alt</kbd>+<kbd>↑</kbd> 한 줄 뒤로 · <kbd>Alt</kbd>+<kbd>→</kbd> 커서까지 · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 전체 실행</span>
+        </div>
       </article>
 
       <div class="side-column">
@@ -95,11 +106,12 @@
           </div>
         </article>
 
-        <article class="panel output-panel">
+        <article class="panel output-panel" id="output-panel">
           <div class="panel-header compact">
             <div class="panel-title"><span aria-hidden="true">›_</span><span>실행 결과</span></div>
             <div class="output-meta">
               <span id="elapsed-time"></span>
+              <button class="icon-button" id="clear-button" type="button" title="결과 지우기" aria-label="실행 결과 지우기">지우기</button>
               <button class="icon-button" id="copy-button" type="button" title="결과 복사" aria-label="실행 결과 복사">복사</button>
             </div>
           </div>
@@ -116,14 +128,18 @@
       </div>
     </section>
 
-    <p class="privacy-note">코드와 불러온 TXT 파일은 서버로 전송되지 않습니다. TXT 파일은 새로고침하면 사라집니다. 되돌리기는 실행 이력을 처음부터 재생하므로 파일 쓰기·네트워크·난수처럼 외부 상태를 바꾸는 코드는 결과가 달라질 수 있습니다.</p>
+    <p class="privacy-note">코드와 불러온 TXT 파일은 서버로 전송되지 않습니다. TXT 파일은 새로고침하면 사라집니다. 한 줄 뒤로는 실행 이력을 처음부터 재생하므로 파일 쓰기·네트워크·난수처럼 외부 상태를 바꾸는 코드는 결과가 달라질 수 있습니다.</p>
   </main>
 
   <footer>
-    <span>Python powered by Pyodide</span>
+    <span>Python powered by Pyodide · Editor by CodeMirror</span>
     <a href="https://pyodide.org/" target="_blank" rel="noreferrer">Pyodide 알아보기 ↗</a>
   </footer>
 
-  <script type="module" src="./app.js?v=4"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+  <script type="module" src="./app.js?v=5"></script>
 </body>
 </html>
