@@ -1,3 +1,5 @@
+import { exampleGroups, examples } from "./examples.js?v=1";
+
 const PYODIDE_VERSION = "0.29.3";
 const STORAGE_KEY = "python-classroom-runner:code";
 const FILE_NAME_STORAGE_KEY = "python-classroom-runner:file-name";
@@ -11,13 +13,6 @@ const MAX_PYTHON_FILE_SIZE = 1024 * 1024;
 const THEME_STORAGE_KEY = "python-classroom-runner:theme";
 const OUTPUT_PLACEHOLDER = "";
 
-const examples = {
-  hello: `# 첫 번째 Python 프로그램\nname = "파이썬 교실"\nprint(f"안녕하세요, {name}!")\nprint("3 + 4 =", 3 + 4)`,
-  loop: `# 1부터 10까지 짝수의 합\ntotal = 0\n\nfor number in range(1, 11):\n    if number % 2 == 0:\n        print("짝수:", number)\n        total += number\n\nprint("합계:", total)`,
-  function: `# 함수 안으로도 한 줄씩 들어갈 수 있습니다\ndef celsius_to_fahrenheit(celsius):\n    result = celsius * 9 / 5 + 32\n    return result\n\nfor temperature in [0, 10, 25]:\n    converted = celsius_to_fahrenheit(temperature)\n    print(f"{temperature}°C → {converted:.1f}°F")`,
-  input: `# input()을 만나면 터미널 입력창이 나타납니다\nname = input("이름: ")\nage = int(input("나이: "))\n\nprint(f"반가워요, {name}님!")\nprint(f"내년에는 {age + 1}살이 됩니다.")`,
-  read: `# 먼저 [TXT 불러오기]로 sample.txt 파일을 선택하세요\nwith open("sample.txt", "r", encoding="utf-8") as file:\n    content = file.read()\n\nprint(content)`,
-};
 
 const output = document.querySelector("#output");
 const outputPanel = document.querySelector("#output-panel");
@@ -78,6 +73,8 @@ function freshSession(code) {
     executedCount: 0,
     currentLine: null,
     request: null,
+    // 입력·한 줄 실행 때 처음부터 다시 실행해도 같은 난수가 나오도록 고정합니다.
+    seed: Math.floor(Math.random() * 2 ** 31),
     started: false,
     complete: false,
   };
@@ -199,7 +196,7 @@ function createWorker() {
   workerReady = false;
   setRuntimeState("loading", "준비 중…");
   updateControls();
-  worker = new Worker("./python-worker.js?v=5", { type: "module" });
+  worker = new Worker("./python-worker.js?v=8", { type: "module" });
 
   worker.addEventListener("message", handleWorkerMessage);
   worker.addEventListener("error", (event) => {
@@ -378,7 +375,7 @@ function startExecution(request, resume = false) {
     type: "execute",
     code,
     inputs: session.inputs,
-    request: { ...request, stream: request.mode === "full" },
+    request: { ...request, stream: request.mode === "full", seed: session.seed },
     files: Array.from(loadedTextFiles, ([name, content]) => ({ name, content })),
   });
 }
@@ -525,19 +522,39 @@ function replaceCode(code) {
   editor.focus();
 }
 
+function renderExampleOptions() {
+  for (const group of exampleGroups) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+    for (const example of group.examples) {
+      optgroup.append(new Option(example.title, example.id));
+    }
+    exampleSelect.append(optgroup);
+  }
+}
+
 function loadExample(name) {
   exampleSelect.value = "";
-  let example = examples[name];
+  const example = examples[name];
   if (!example) return;
+  let { code } = example;
   if (name === "read" && loadedTextFiles.size) {
     const textFileName = loadedTextFiles.keys().next().value;
-    example = `# 불러온 TXT 파일을 read()로 읽습니다\nwith open(${JSON.stringify(textFileName)}, "r", encoding="utf-8") as file:\n    content = file.read()\n\nprint(content)`;
+    code = `# 추가한 파일을 read()로 읽습니다\nwith open(${JSON.stringify(textFileName)}, "r", encoding="utf-8") as file:\n    content = file.read()\n\nprint(content)`;
   }
-  if (editor.getValue().trim() && editor.getValue() !== example
+  if (editor.getValue().trim() && editor.getValue() !== code
     && !window.confirm("지금 코드를 예제로 바꿀까요?")) {
     return;
   }
-  replaceCode(example);
+  replaceCode(code);
+
+  // 예제에 필요한 데이터 파일이 있으면 함께 추가합니다.
+  const files = Object.entries(example.files || {});
+  if (files.length) {
+    for (const [fileName, content] of files) loadedTextFiles.set(fileName, content);
+    renderLoadedFiles();
+    renderOutput({ note: `${files.map(([fileName]) => fileName).join(", ")} 추가됨` });
+  }
 }
 
 function saveDraft() {
@@ -603,8 +620,8 @@ async function loadTextFiles() {
 
   for (const file of selectedFiles) {
     const textFileName = file.name.replaceAll("\\", "/").split("/").pop().replaceAll("\0", "");
-    if (!textFileName.toLowerCase().endsWith(".txt")) {
-      errors.push(`${file.name}: TXT 파일만 추가할 수 있어요.`);
+    if (!/\.(txt|csv)$/i.test(textFileName)) {
+      errors.push(`${file.name}: TXT·CSV 파일만 추가할 수 있어요.`);
       continue;
     }
     if (file.size > MAX_TEXT_FILE_SIZE) {
@@ -624,7 +641,7 @@ async function loadTextFiles() {
   resetDebugSession(editor.getValue().trimEnd(), false);
 
   const note = loadedCount
-    ? `TXT ${loadedCount}개 추가됨 · open("파일명.txt")로 읽을 수 있어요.`
+    ? `파일 ${loadedCount}개 추가됨 · open("파일 이름")으로 읽을 수 있어요.`
     : "";
   renderOutput({ note, error: errors.join("\n") });
 }
@@ -738,7 +755,8 @@ copyButton.addEventListener("click", async () => {
   setTimeout(() => { copyButton.textContent = "복사"; }, 1200);
 });
 
-editor.setValue(localStorage.getItem(STORAGE_KEY) ?? examples.hello);
+renderExampleOptions();
+editor.setValue(localStorage.getItem(STORAGE_KEY) ?? examples.hello.code);
 setFileName(fileName);
 applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 renderLoadedFiles();

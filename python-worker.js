@@ -2,6 +2,8 @@ let pyodide;
 let initialized = false;
 let busy = false;
 let mountedTextFileNames = new Set();
+let snapshotSessionId = null;
+let snapshotFiles = new Map();
 
 const PYTHON_RUNNER = String.raw`
 import builtins as _builtins
@@ -22,6 +24,9 @@ _FLUSH_INTERVAL = 0.05
 _code = str(__runner_code)
 _inputs = _json.loads(str(__runner_inputs_json))
 _request = _json.loads(str(__runner_request_json))
+if _request.get("seed") is not None:
+    import random as _random
+    _random.seed(_request["seed"])
 _stream = bool(_request.get("stream"))
 _emit = __runner_emit
 _input_index = 0
@@ -216,7 +221,7 @@ def _error_hint(error):
             return "값이 None이에요. 결과를 돌려주지 않는 함수의 결과를 썼는지 보세요."
         return "이 자료형에는 그런 기능이 없어요. 철자를 확인해 보세요."
     if isinstance(error, FileNotFoundError):
-        return "파일이 없어요. [파일 → TXT 추가]로 먼저 추가하세요."
+        return "파일이 없어요. [파일 → TXT·CSV 추가]로 먼저 추가하세요."
     if isinstance(error, ModuleNotFoundError):
         return "여기서는 쓸 수 없는 모듈이에요."
     if isinstance(error, RecursionError):
@@ -256,6 +261,18 @@ _environment = {
 }
 _student_builtins = dict(vars(_builtins))
 _student_builtins["input"] = _classroom_input
+
+# 학생 코드가 연 파일을 기억했다가 실행이 끝나거나 멈추면 닫습니다.
+# 닫지 않으면 버퍼에 남은 내용이 다음 실행 중에 뒤늦게 기록될 수 있습니다.
+_open_files = []
+_original_open = _builtins.open
+
+def _classroom_open(*args, **kwargs):
+    file = _original_open(*args, **kwargs)
+    _open_files.append(file)
+    return file
+
+_student_builtins["open"] = _classroom_open
 _environment["__builtins__"] = _student_builtins
 
 _result = None
@@ -311,6 +328,12 @@ except BaseException as error:
         "hint": _error_hint(error),
     }
 
+for _file in _open_files:
+    try:
+        _file.close()
+    except BaseException:
+        pass
+
 _json.dumps(_result, ensure_ascii=False)
 `;
 
@@ -346,6 +369,7 @@ async function execute(code, inputs = [], request = { mode: "full" }, files = []
     self.postMessage({ type: "status", message: "실행 중…" });
 
     mountTextFiles(files);
+    restoreSessionFiles(request.seed);
 
     pyodide.globals.set("__runner_code", code);
     pyodide.globals.set("__runner_inputs_json", JSON.stringify(inputs));
@@ -381,9 +405,32 @@ function mountTextFiles(files) {
   mountedTextFileNames = nextFileNames;
 }
 
+// 입력을 받거나 한 줄씩 실행할 때는 프로그램을 처음부터 다시 실행합니다.
+// 같은 실행 안에서 다시 실행할 때는 작업 폴더를 실행 시작 시점으로 되돌려
+// 파일 쓰기('a' 모드 등)가 여러 번 반복되지 않게 합니다.
+function restoreSessionFiles(sessionId) {
+  if (sessionId == null) return;
+  if (sessionId !== snapshotSessionId) {
+    snapshotSessionId = sessionId;
+    snapshotFiles = new Map(listWorkingFiles().map((name) => [name, pyodide.FS.readFile(name)]));
+    return;
+  }
+  for (const name of listWorkingFiles()) {
+    if (!snapshotFiles.has(name)) pyodide.FS.unlink(name);
+  }
+  for (const [name, data] of snapshotFiles) pyodide.FS.writeFile(name, data);
+}
+
+function listWorkingFiles() {
+  return pyodide.FS.readdir(".").filter((name) => {
+    if (name === "." || name === "..") return false;
+    return pyodide.FS.isFile(pyodide.FS.stat(name).mode);
+  });
+}
+
 function safeTextFileName(value) {
   const fileName = String(value ?? "").replaceAll("\\", "/").split("/").pop().replaceAll("\0", "");
-  return fileName && fileName.toLowerCase().endsWith(".txt") ? fileName : "";
+  return fileName && /\.(txt|csv)$/i.test(fileName) ? fileName : "";
 }
 
 function formatError(error) {
