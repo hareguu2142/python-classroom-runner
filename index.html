@@ -1,145 +1,118 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="설치 없이 브라우저에서 바로 실행하는 수업용 Python 실습기">
   <title>파이썬 교실</title>
+  <script>
+    try {
+      if (localStorage.getItem("python-classroom-runner:theme") === "dark") document.documentElement.dataset.theme = "dark";
+    } catch { /* 저장된 테마가 없으면 밝은 테마로 시작합니다. */ }
+  </script>
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
-  <link rel="stylesheet" href="./style.css?v=5">
+  <link rel="stylesheet" href="./style.css?v=6">
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="./" aria-label="파이썬 교실 홈">
       <span class="brand-mark" aria-hidden="true">Py</span>
-      <span>
-        <strong>파이썬 교실</strong>
-        <small>브라우저에서 바로 배우는 Python</small>
-      </span>
+      <strong>파이썬 교실</strong>
     </a>
     <div class="header-tools">
-      <div class="font-size-control" role="group" aria-label="글자 크기 조절">
-        <button id="font-size-decrease" type="button" aria-label="글자 크기 줄이기" title="글자 크기 줄이기">A−</button>
-        <output id="font-size-value" for="font-size-decrease font-size-increase" aria-live="polite">100%</output>
-        <button id="font-size-increase" type="button" aria-label="글자 크기 키우기" title="글자 크기 키우기">A+</button>
-      </div>
       <div class="runtime-state" id="runtime-state" data-state="loading" aria-live="polite">
         <span class="state-dot"></span>
-        <span id="runtime-label">Python 준비 중…</span>
+        <span id="runtime-label">준비 중…</span>
       </div>
+      <div class="font-size-control" role="group" aria-label="글자 크기">
+        <button id="font-size-decrease" type="button" aria-label="글자 작게" title="글자 작게">A−</button>
+        <output id="font-size-value" for="font-size-decrease font-size-increase" aria-live="polite">100%</output>
+        <button id="font-size-increase" type="button" aria-label="글자 크게" title="글자 크게">A+</button>
+      </div>
+      <button class="button button-plain" id="theme-toggle" type="button" title="화면 테마 바꾸기">어둡게</button>
     </div>
   </header>
 
-  <main>
-    <section class="hero">
-      <div>
-        <p class="eyebrow">설치 없이 시작하기</p>
-        <h1>코드를 쓰고, 바로 확인하세요.</h1>
-        <p>학생의 브라우저 안에서 Python이 실행됩니다. 작성한 코드는 서버로 전송되지 않습니다.</p>
+  <main class="workspace" aria-label="Python 코드 실습기">
+    <article class="panel editor-panel">
+      <div class="panel-header">
+        <div class="editor-tools">
+          <span class="panel-title" id="file-name">main.py</span>
+          <select id="example-select" aria-label="예제">
+            <option value="" disabled selected>예제</option>
+            <option value="hello">첫 프로그램</option>
+            <option value="loop">반복문</option>
+            <option value="function">함수</option>
+            <option value="input">입력받기</option>
+            <option value="read">TXT 읽기</option>
+          </select>
+          <details class="menu" id="file-menu">
+            <summary class="button button-plain">파일</summary>
+            <div class="menu-list">
+              <button id="open-button" type="button">열기 (.py)</button>
+              <input id="py-file-input" type="file" accept=".py,text/x-python" hidden>
+              <button id="save-button" type="button">저장 (.py)</button>
+              <button id="file-button" type="button">TXT 추가</button>
+              <input id="file-input" type="file" accept=".txt,text/plain" multiple hidden>
+              <button id="reset-button" type="button">처음으로</button>
+            </div>
+          </details>
+        </div>
+        <div class="editor-actions">
+          <button class="button button-plain" id="back-button" type="button" disabled title="이전 줄로 (Shift+F10 · Alt+↑)">이전</button>
+          <button class="button button-plain" id="step-button" type="button" disabled title="한 줄 실행 (F10 · Alt+↓)">한 줄</button>
+          <button class="button button-plain" id="cursor-button" type="button" disabled title="커서 줄까지 실행 (Ctrl+F10 · Alt+→)">커서까지</button>
+          <button class="button button-plain" id="stop-button" type="button" disabled>중지</button>
+          <button class="button button-run" id="run-button" type="button" disabled title="실행 (Ctrl+Enter)">▶ 실행</button>
+        </div>
       </div>
-      <label class="example-picker">
-        <span>예제 불러오기</span>
-        <select id="example-select" aria-label="예제 코드 선택">
-          <option value="" disabled selected>예제를 고르세요</option>
-          <option value="hello">첫 번째 프로그램</option>
-          <option value="loop">반복문</option>
-          <option value="function">함수</option>
-          <option value="input">입력받기</option>
-          <option value="read">TXT 파일 읽기</option>
-        </select>
-      </label>
-    </section>
+      <div class="file-shelf" id="file-shelf" hidden>
+        <div class="loaded-files" id="loaded-files" aria-live="polite"></div>
+      </div>
+      <div class="editor-wrap">
+        <textarea id="code-editor" aria-label="Python 코드" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        <span class="toast" id="save-status" role="status" hidden></span>
+      </div>
+    </article>
 
-    <section class="workspace" aria-label="Python 코드 실습기">
-      <article class="panel editor-panel">
-        <div class="panel-header">
-          <div class="panel-title">
-            <span class="file-icon" aria-hidden="true">⌁</span>
-            <span id="file-name">main.py</span>
-          </div>
-          <div class="editor-actions">
-            <button class="button button-debug" id="back-button" type="button" disabled title="한 줄 뒤로 (Shift+F10 또는 Alt+↑)">↶ 한 줄 뒤로</button>
-            <button class="button button-debug" id="step-button" type="button" disabled title="한 줄 실행 (F10 또는 Alt+↓)">↓ 한 줄</button>
-            <button class="button button-debug" id="cursor-button" type="button" disabled title="커서가 있는 줄까지 실행 (Ctrl+F10 또는 Alt+→)">⇥ 커서까지</button>
-            <button class="button button-stop" id="stop-button" type="button" disabled>■ 중지</button>
-            <button class="button button-run" id="run-button" type="button" disabled title="전체 실행 (Ctrl+Enter)">
-              <span aria-hidden="true">▶</span> 전체 실행
-            </button>
+    <div class="side-column">
+      <article class="panel output-panel" id="output-panel">
+        <div class="panel-header compact">
+          <span class="panel-title">결과</span>
+          <div class="output-meta">
+            <span id="elapsed-time"></span>
+            <button class="icon-button" id="clear-button" type="button" aria-label="결과 지우기">지우기</button>
+            <button class="icon-button" id="copy-button" type="button" aria-label="결과 복사">복사</button>
           </div>
         </div>
-        <div class="file-shelf">
-          <div class="file-shelf-files" aria-live="polite">
-            <span class="file-shelf-label">읽을 파일</span>
-            <div class="loaded-files" id="loaded-files"><span class="muted">불러온 TXT 파일이 없습니다.</span></div>
-          </div>
-          <div class="file-actions">
-            <button class="button button-small button-file" id="file-button" type="button" title="Python 코드에서 open()으로 읽을 TXT 파일을 불러옵니다">TXT 불러오기</button>
-            <input id="file-input" type="file" accept=".txt,text/plain" multiple hidden>
-            <button class="button button-small button-ghost" id="open-button" type="button" title="내 컴퓨터의 .py 파일을 편집기로 엽니다">열기</button>
-            <input id="py-file-input" type="file" accept=".py,text/x-python" hidden>
-            <button class="button button-small button-ghost" id="save-button" type="button" title="지금 코드를 .py 파일로 내려받습니다">.py 저장</button>
-            <button class="button button-small button-ghost" id="reset-button" type="button" title="편집기를 첫 번째 예제 코드로 바꿉니다">처음 코드로</button>
-          </div>
-        </div>
-        <div class="editor-wrap">
-          <textarea id="code-editor" aria-label="Python 코드 입력" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
-        </div>
-        <div class="editor-footer">
-          <span class="save-status" id="save-status">브라우저에 자동 저장됩니다</span>
-          <span class="keyboard-hint"><kbd>F10</kbd>/<kbd>Alt</kbd>+<kbd>↓</kbd> 한 줄 · <kbd>Alt</kbd>+<kbd>↑</kbd> 한 줄 뒤로 · <kbd>Alt</kbd>+<kbd>→</kbd> 커서까지 · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> 전체 실행</span>
+        <div class="terminal">
+          <pre id="output" tabindex="0" aria-live="polite"></pre>
+          <form class="terminal-input" id="terminal-input" hidden>
+            <span class="terminal-chevron" aria-hidden="true">›</span>
+            <label class="sr-only" for="terminal-input-value">프로그램 입력</label>
+            <input id="terminal-input-value" type="text" autocomplete="off" spellcheck="false" placeholder="입력 후 Enter">
+            <button type="submit">입력</button>
+          </form>
         </div>
       </article>
 
-      <div class="side-column">
-        <article class="panel debug-panel">
-          <div class="panel-header compact">
-            <div class="panel-title"><span aria-hidden="true">◎</span><span>디버그 상태</span></div>
-            <span class="debug-location" id="debug-location">실행 전</span>
-          </div>
-          <div class="debug-content">
-            <div class="debug-summary">
-              <span id="debug-mode">준비됨</span>
-              <span id="debug-step-count">0줄 실행</span>
-            </div>
-            <div class="variables" id="variables"><span class="muted">한 줄 실행을 누르면 현재 변수가 표시됩니다.</span></div>
-          </div>
-        </article>
-
-        <article class="panel output-panel" id="output-panel">
-          <div class="panel-header compact">
-            <div class="panel-title"><span aria-hidden="true">›_</span><span>실행 결과</span></div>
-            <div class="output-meta">
-              <span id="elapsed-time"></span>
-              <button class="icon-button" id="clear-button" type="button" title="결과 지우기" aria-label="실행 결과 지우기">지우기</button>
-              <button class="icon-button" id="copy-button" type="button" title="결과 복사" aria-label="실행 결과 복사">복사</button>
-            </div>
-          </div>
-          <div class="terminal">
-            <pre id="output" tabindex="0" aria-live="polite"><span class="muted">실행 버튼을 누르면 결과가 여기에 표시됩니다.</span></pre>
-            <form class="terminal-input" id="terminal-input" hidden>
-              <span class="terminal-chevron" aria-hidden="true">›</span>
-              <label class="sr-only" for="terminal-input-value">프로그램 입력</label>
-              <input id="terminal-input-value" type="text" autocomplete="off" spellcheck="false" placeholder="값을 입력하고 Enter">
-              <button type="submit">입력</button>
-            </form>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <p class="privacy-note">코드와 불러온 TXT 파일은 서버로 전송되지 않습니다. TXT 파일은 새로고침하면 사라집니다. 한 줄 뒤로는 실행 이력을 처음부터 재생하므로 파일 쓰기·네트워크·난수처럼 외부 상태를 바꾸는 코드는 결과가 달라질 수 있습니다.</p>
+      <article class="panel debug-panel">
+        <div class="panel-header compact">
+          <span class="panel-title">변수</span>
+          <span class="debug-location" id="debug-location"></span>
+        </div>
+        <div class="variables" id="variables"></div>
+      </article>
+    </div>
   </main>
 
-  <footer>
-    <span>Python powered by Pyodide · Editor by CodeMirror</span>
-    <a href="https://pyodide.org/" target="_blank" rel="noreferrer">Pyodide 알아보기 ↗</a>
-  </footer>
+  <footer>Pyodide · CodeMirror</footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/python/python.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
-  <script type="module" src="./app.js?v=5"></script>
+  <script type="module" src="./app.js?v=6"></script>
 </body>
 </html>

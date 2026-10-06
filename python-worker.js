@@ -136,92 +136,91 @@ def _error_hint(error):
     message = str(error.msg if isinstance(error, SyntaxError) else error)
 
     if isinstance(error, TabError):
-        return "탭과 스페이스를 섞어서 들여쓰기했어요. 들여쓰기는 스페이스 4칸으로 통일하세요."
+        return "탭과 스페이스가 섞였어요. 스페이스 4칸으로 맞춰 보세요."
     if isinstance(error, IndentationError):
         if "expected an indented block" in message:
-            return "콜론(:)으로 끝나는 줄의 다음 줄은 안쪽으로 들여써야 해요. 줄 앞에 스페이스 4칸(Tab 키)을 넣어 보세요."
+            return "콜론(:) 다음 줄은 4칸 들여써야 해요."
         if "unexpected indent" in message:
-            return "들여쓸 필요가 없는 줄이 들여써져 있어요. 줄 앞의 공백을 지워 보세요."
+            return "들여쓰지 않아도 되는 줄이에요. 앞 공백을 지워 보세요."
         if "unindent does not match" in message:
-            return "같은 블록에 속한 줄은 들여쓰기 칸 수가 같아야 해요. 위아래 줄과 칸 수를 맞춰 보세요."
-        return "들여쓰기를 확인하세요. 같은 블록의 줄은 같은 칸 수만큼 들여써야 해요."
+            return "같은 블록의 줄은 들여쓰기 칸 수가 같아야 해요."
+        return "들여쓰기 칸 수를 확인해 보세요."
     if isinstance(error, SyntaxError):
         if "expected ':'" in message:
-            return "if, for, while, def, else 같은 줄 끝에는 콜론(:)이 필요해요."
+            return "줄 끝에 콜론(:)이 빠졌어요."
         if "was never closed" in message:
-            return "여는 괄호가 닫히지 않았어요. ( [ { 와 ) ] } 의 짝을 확인하세요. 표시된 줄보다 윗줄이 원인일 수도 있어요."
+            return "괄호가 닫히지 않았어요. 윗줄도 확인해 보세요."
         if "unmatched" in message or "does not match opening" in message:
-            return "닫는 괄호와 여는 괄호의 짝이 맞지 않아요. 괄호 개수와 종류를 확인하세요."
+            return "괄호 짝이 맞지 않아요."
         if "unterminated" in message:
-            return "문자열의 따옴표가 닫히지 않았어요. 시작과 끝 따옴표(\" 또는 ')를 같은 종류로 맞춰 보세요."
+            return "따옴표가 닫히지 않았어요."
         if "invalid character" in message or "non-printable" in message:
-            return "파이썬에서 쓸 수 없는 문자가 있어요. 한글 자판의 전각 기호(“ ” ‘ ’ （ ） ：)나 이상한 공백이 섞였는지 확인하세요."
+            return "쓸 수 없는 문자가 있어요. 전각 기호(“ ” （ ）)가 섞였는지 보세요."
         if "Missing parentheses in call to 'print'" in message:
-            return "print는 함수라서 print(\"안녕\")처럼 괄호가 필요해요."
+            return "print 뒤에 괄호가 필요해요. 예: print(\"안녕\")"
         if "Maybe you meant '=='" in message:
-            return "같은지 비교할 때는 = 가 아니라 == 를 써요."
+            return "비교할 때는 = 대신 == 를 써요."
         if "forgot a comma" in message:
-            return "값 사이에 쉼표(,)가 빠졌을 수 있어요."
+            return "쉼표(,)가 빠진 것 같아요."
         if "invalid decimal literal" in message:
-            return "변수 이름은 숫자로 시작할 수 없어요. 숫자와 글자 사이에 연산자가 빠졌는지도 확인하세요."
+            return "이름은 숫자로 시작할 수 없어요."
         if "outside function" in message:
-            return "return은 함수(def) 안에서만 쓸 수 있어요. 들여쓰기를 확인하세요."
+            return "return은 함수 안에서만 쓸 수 있어요."
         if "outside loop" in message:
-            return "break와 continue는 for나 while 반복문 안에서만 쓸 수 있어요. 들여쓰기를 확인하세요."
-        return "문법이 잘못되었어요. 오타, 빠진 괄호·따옴표·쉼표·콜론을 확인하세요. 표시된 줄의 바로 윗줄이 원인일 때도 많아요."
+            return "break와 continue는 반복문 안에서만 쓸 수 있어요."
+        return "오타나 빠진 괄호·따옴표·콜론이 있는지 보세요. 윗줄이 원인일 때도 많아요."
 
     if isinstance(error, UnboundLocalError):
-        return "함수 안에서 바꾸려는 변수에 아직 값이 없어요. 함수 안에서 먼저 값을 넣거나 매개변수로 받아 보세요."
+        return "함수 안에서 값을 넣기 전에 변수를 썼어요."
     if isinstance(error, NameError):
         name = getattr(error, "name", None) or "이 이름"
-        return (f"'{name}'(이)라는 이름을 찾을 수 없어요. 철자와 대소문자가 맞는지, 사용하기 전에 값을 넣었는지 확인하세요. "
-                f"글자를 쓰려던 거라면 \"{name}\"처럼 따옴표로 감싸야 해요.")
+        return f"'{name}'이(가) 없어요. 철자를 확인하거나, 글자라면 따옴표로 감싸세요."
     if isinstance(error, TypeError):
         if "can only concatenate str" in message or ("unsupported operand" in message and "'str'" in message):
-            return "문자열(str)과 숫자는 바로 계산하거나 +로 붙일 수 없어요. 숫자로 계산하려면 int()/float()로, 글자로 붙이려면 str()이나 f-string(f\"{값}\")을 쓰세요. input()으로 받은 값은 항상 문자열이에요."
+            return "글자와 숫자는 바로 계산할 수 없어요. int()나 str()로 맞춰 보세요."
         if "not supported between instances" in message:
-            return "자료형이 다른 값끼리 크기를 비교했어요. input()으로 받은 값이라면 int()로 바꿔서 비교하세요."
+            return "글자와 숫자는 비교할 수 없어요. int()로 바꿔 보세요."
         if "required positional argument" in message:
-            return "함수를 부를 때 필요한 값(인자)을 빠뜨렸어요. 함수 정의의 매개변수 개수와 맞춰 보세요."
+            return "함수에 넘길 값이 빠졌어요."
         if "positional argument" in message and "given" in message:
-            return "함수에 넘긴 값의 개수가 함수 정의와 달라요."
+            return "함수에 넘긴 값의 개수가 맞지 않아요."
         if "is not callable" in message:
-            return "함수가 아닌 값에 ( )를 붙여 호출했어요. 변수 이름을 print, input, list, sum처럼 함수 이름과 똑같이 짓지 않았는지 확인하세요."
+            return "함수가 아닌 것을 호출했어요. 변수 이름이 함수 이름과 겹치는지 보세요."
         if "not subscriptable" in message:
-            return "[ ]로 꺼낼 수 없는 값이에요. 리스트·문자열·딕셔너리가 맞는지 확인하세요."
+            return "[ ]로 꺼낼 수 없는 값이에요."
         if "not iterable" in message:
-            return "for로 반복할 수 없는 값이에요. 숫자만큼 반복하려면 range(숫자)를 쓰세요."
+            return "for로 반복할 수 없는 값이에요. 숫자라면 range()를 쓰세요."
         if "indices must be integers" in message:
-            return "인덱스는 정수여야 해요. input()으로 받은 값이면 int()로 바꾸세요."
+            return "인덱스는 정수여야 해요. int()로 바꿔 보세요."
         if "can't multiply sequence" in message:
-            return "문자열이나 리스트에는 정수만 곱할 수 있어요. input()으로 받은 값이면 int()로 바꾸세요."
-        return "값의 자료형이 맞지 않아요. print(type(값))으로 자료형을 확인해 보세요."
+            return "글자에는 정수만 곱할 수 있어요. int()로 바꿔 보세요."
+        return "자료형이 맞지 않아요. type()으로 확인해 보세요."
     if isinstance(error, UnicodeDecodeError):
-        return "파일의 글자 인코딩이 달라요. open(..., encoding=\"cp949\")로 바꿔 보세요."
+        return "인코딩이 달라요. encoding=\"cp949\"로 바꿔 보세요."
     if isinstance(error, ValueError):
         if "invalid literal for int()" in message:
-            return "숫자가 아닌 글자를 int()로 바꾸려 했어요. 입력값에 글자·공백·소수점이 섞이지 않았는지 확인하세요. 소수는 float()을 쓰세요."
+            return "숫자가 아닌 값은 int()로 바꿀 수 없어요."
         if "could not convert string to float" in message:
-            return "숫자가 아닌 글자를 float()로 바꾸려 했어요. 입력값을 확인하세요."
+            return "숫자가 아닌 값은 float()로 바꿀 수 없어요."
         if "values to unpack" in message:
-            return "= 왼쪽 변수 개수와 오른쪽 값 개수가 달라요."
+            return "= 양쪽의 개수가 맞지 않아요."
         return None
     if isinstance(error, ZeroDivisionError):
-        return "0으로 나눌 수 없어요. 나누는 값이 0이 되는 경우를 if로 먼저 확인하세요."
+        return "0으로 나눌 수 없어요."
     if isinstance(error, IndexError):
-        return "리스트(또는 문자열)의 범위를 벗어난 위치를 꺼냈어요. 인덱스는 0부터 len()-1까지예요."
+        return "범위를 벗어났어요. 인덱스는 0부터 len()-1까지예요."
     if isinstance(error, KeyError):
-        return f"딕셔너리에 {message} 키가 없어요. 철자와 대소문자를 확인하거나, if 키 in 딕셔너리: 로 먼저 확인하세요."
+        return f"딕셔너리에 {message} 키가 없어요."
     if isinstance(error, AttributeError):
         if "'NoneType'" in message:
-            return "값이 None이에요. return이 없는 함수의 결과나 sort()·append()처럼 결과를 돌려주지 않는 메서드의 결과를 변수에 넣었는지 확인하세요."
-        return "이 자료형에는 그런 기능(메서드)이 없어요. 이름의 철자와 값의 자료형을 확인하세요."
+            return "값이 None이에요. 결과를 돌려주지 않는 함수의 결과를 썼는지 보세요."
+        return "이 자료형에는 그런 기능이 없어요. 철자를 확인해 보세요."
     if isinstance(error, FileNotFoundError):
-        return "파일을 찾을 수 없어요. 먼저 [TXT 불러오기]로 파일을 불러오고, 코드의 파일 이름이 '읽을 파일' 목록과 똑같은지 확인하세요."
+        return "파일이 없어요. [파일 → TXT 추가]로 먼저 추가하세요."
     if isinstance(error, ModuleNotFoundError):
-        return "이 실습기에서 쓸 수 없는 모듈이거나 이름이 틀렸어요. turtle, tkinter처럼 새 창을 여는 모듈은 지원되지 않아요."
+        return "여기서는 쓸 수 없는 모듈이에요."
     if isinstance(error, RecursionError):
-        return "함수가 자기 자신을 끝없이 호출했어요. 재귀를 멈추는 조건을 확인하세요."
+        return "함수가 끝없이 자기 자신을 불렀어요. 멈추는 조건을 확인하세요."
     return None
 
 def _classroom_input(prompt=""):
@@ -342,9 +341,9 @@ async function initialize(version) {
 async function execute(code, inputs = [], request = { mode: "full" }, files = []) {
   busy = true;
   try {
-    self.postMessage({ type: "status", message: "필요한 패키지 확인 중…" });
+    self.postMessage({ type: "status", message: "패키지 확인 중…" });
     await pyodide.loadPackagesFromImports(code);
-    self.postMessage({ type: "status", message: "코드 실행 중…" });
+    self.postMessage({ type: "status", message: "실행 중…" });
 
     mountTextFiles(files);
 

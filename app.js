@@ -8,7 +8,8 @@ const MIN_FONT_SIZE = 14;
 const MAX_FONT_SIZE = 20;
 const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_PYTHON_FILE_SIZE = 1024 * 1024;
-const OUTPUT_PLACEHOLDER = "실행 버튼을 누르면 결과가 여기에 표시됩니다.";
+const THEME_STORAGE_KEY = "python-classroom-runner:theme";
+const OUTPUT_PLACEHOLDER = "";
 
 const examples = {
   hello: `# 첫 번째 Python 프로그램\nname = "파이썬 교실"\nprint(f"안녕하세요, {name}!")\nprint("3 + 4 =", 3 + 4)`,
@@ -33,8 +34,6 @@ const runtimeState = document.querySelector("#runtime-state");
 const runtimeLabel = document.querySelector("#runtime-label");
 const elapsedTime = document.querySelector("#elapsed-time");
 const debugLocation = document.querySelector("#debug-location");
-const debugMode = document.querySelector("#debug-mode");
-const debugStepCount = document.querySelector("#debug-step-count");
 const variables = document.querySelector("#variables");
 const terminalInputForm = document.querySelector("#terminal-input");
 const terminalInputValue = document.querySelector("#terminal-input-value");
@@ -48,6 +47,9 @@ const pyFileInput = document.querySelector("#py-file-input");
 const saveButton = document.querySelector("#save-button");
 const saveStatus = document.querySelector("#save-status");
 const fileNameElement = document.querySelector("#file-name");
+const fileShelf = document.querySelector("#file-shelf");
+const fileMenu = document.querySelector("#file-menu");
+const themeToggle = document.querySelector("#theme-toggle");
 const loadedFilesElement = document.querySelector("#loaded-files");
 
 let worker;
@@ -170,6 +172,12 @@ function createEditor(textarea) {
   };
 }
 
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  themeToggle.textContent = theme === "dark" ? "밝게" : "어둡게";
+  try { localStorage.setItem(THEME_STORAGE_KEY, theme); } catch { /* 저장하지 못해도 화면은 바뀝니다. */ }
+}
+
 function getSavedFontSize() {
   const savedSize = Number.parseInt(localStorage.getItem(FONT_SIZE_STORAGE_KEY), 10);
   return Number.isFinite(savedSize)
@@ -189,16 +197,16 @@ function applyFontSize(nextSize) {
 
 function createWorker() {
   workerReady = false;
-  setRuntimeState("loading", "Python 준비 중…");
+  setRuntimeState("loading", "준비 중…");
   updateControls();
-  worker = new Worker("./python-worker.js?v=4", { type: "module" });
+  worker = new Worker("./python-worker.js?v=5", { type: "module" });
 
   worker.addEventListener("message", handleWorkerMessage);
   worker.addEventListener("error", (event) => {
     running = false;
     waitingForInput = false;
-    setRuntimeState("error", "Python을 불러오지 못했습니다");
-    renderOutput({ error: `실행 환경 오류: ${event.message}\n\n인터넷 연결을 확인한 뒤 새로고침해 주세요.` });
+    setRuntimeState("error", "불러오기 실패");
+    renderOutput({ error: `Python을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침하세요.\n(${event.message})` });
     updateControls();
   });
 
@@ -208,7 +216,8 @@ function createWorker() {
 function handleWorkerMessage({ data }) {
   if (data.type === "ready") {
     workerReady = true;
-    setRuntimeState("ready", `Python ${data.pythonVersion} 준비됨`);
+    setRuntimeState("ready", "준비됨");
+    runtimeState.title = `Python ${data.pythonVersion}`;
     updateControls();
     return;
   }
@@ -235,7 +244,7 @@ function handleWorkerMessage({ data }) {
 
   if (data.type === "error") {
     renderOutput({ error: data.message });
-    finishExecution(true, "오류 발생");
+    finishExecution(true, "오류");
   }
 }
 
@@ -247,13 +256,12 @@ function handleExecutionResult(result) {
     running = false;
     waitingForInput = true;
     session.currentLine = result.line || null;
-    renderOutput({ text: result.output || "", placeholder: "입력을 기다리는 중…" });
-    debugMode.textContent = "입력 대기";
-    debugLocation.textContent = result.line ? `${result.line}번 줄` : "input()";
-    setRuntimeState("loading", "프로그램 입력 대기 중…");
+    renderOutput({ text: result.output || "" });
+    debugLocation.textContent = result.line ? `${result.line}번 줄` : "";
+    setRuntimeState("loading", "입력 대기");
     terminalInputForm.hidden = false;
     terminalInputValue.value = "";
-    terminalInputValue.placeholder = result.prompt ? `${result.prompt.trim()} 입력 후 Enter` : "값을 입력하고 Enter";
+    terminalInputValue.placeholder = "입력 후 Enter";
     updateEditorMarks();
     updateControls();
     requestAnimationFrame(() => terminalInputValue.focus());
@@ -266,12 +274,11 @@ function handleExecutionResult(result) {
 
   if (result.status === "paused") {
     session.complete = false;
-    renderOutput({ text: result.output || "", placeholder: `[${result.line}번 줄을 실행하기 전에 멈췄습니다]` });
-    debugMode.textContent = result.scope && result.scope !== "<module>"
-      ? `${result.scope}() 함수 안에서 멈춤`
-      : "일시 정지";
-    debugLocation.textContent = `다음 실행: ${result.line}번 줄`;
-    finishExecution(false, `${result.line}번 줄 앞에서 멈춤`);
+    renderOutput({ text: result.output || "" });
+    debugLocation.textContent = result.scope && result.scope !== "<module>"
+      ? `다음 ${result.line}번 줄 · ${result.scope}()`
+      : `다음 ${result.line}번 줄`;
+    finishExecution(false, "멈춤");
     editor.revealLine(result.line);
     return;
   }
@@ -279,19 +286,17 @@ function handleExecutionResult(result) {
   if (result.status === "done") {
     session.complete = true;
     session.currentLine = null;
-    renderOutput({ text: result.output || "", placeholder: "실행이 완료되었습니다. 출력 내용은 없습니다." });
-    debugMode.textContent = "실행 완료";
+    renderOutput({ text: result.output || "", placeholder: "(출력 없음)" });
     debugLocation.textContent = "끝";
-    finishExecution(false, "실행 완료");
+    finishExecution(false, "완료");
     return;
   }
 
   if (result.status === "error") {
     session.complete = false;
     renderOutput({ text: result.output || "", error: result.error, hint: result.hint });
-    debugMode.textContent = "오류 발생";
-    debugLocation.textContent = result.line ? `${result.line}번 줄에서 오류` : "오류";
-    finishExecution(true, "오류 발생");
+    debugLocation.textContent = result.line ? `${result.line}번 줄 오류` : "오류";
+    finishExecution(true, "오류");
     editor.revealLine(result.line);
   }
 }
@@ -314,7 +319,7 @@ function renderOutput({ text = "", error = "", hint = "", note = "", placeholder
   const nodes = [];
   if (text) nodes.push(document.createTextNode(text));
   if (error) nodes.push(createSpan("output-error", separator + error));
-  if (hint) nodes.push(createSpan("output-hint", `도움말: ${hint}`));
+  if (hint) nodes.push(createSpan("output-hint", hint));
   if (note) nodes.push(createSpan("output-note", separator + note));
   if (!nodes.length) nodes.push(createSpan("muted", placeholder));
   output.replaceChildren(...nodes);
@@ -336,8 +341,7 @@ function resetDebugSession(code = editor.getValue().trimEnd(), clearOutput = tru
   running = false;
   waitingForInput = false;
   terminalInputForm.hidden = true;
-  debugMode.textContent = "준비됨";
-  debugLocation.textContent = "실행 전";
+  debugLocation.textContent = "";
   renderVariables([]);
   if (clearOutput) renderOutput();
   elapsedTime.textContent = "";
@@ -349,7 +353,7 @@ function startExecution(request, resume = false) {
   const code = ensureSession();
   if (!workerReady || running || (!resume && waitingForInput)) return;
   if (!code.trim()) {
-    renderOutput({ error: "실행할 코드를 입력해 주세요." });
+    renderOutput({ error: "코드가 비어 있어요." });
     return;
   }
 
@@ -367,8 +371,7 @@ function startExecution(request, resume = false) {
   if (request.mode === "full" && !resume) {
     renderOutput({ placeholder: "실행 중…" });
   }
-  setRuntimeState("loading", "코드 실행 중…");
-  debugMode.textContent = request.mode === "full" ? "전체 실행 중" : "디버그 실행 중";
+  setRuntimeState("loading", "실행 중…");
   updateControls();
 
   worker.postMessage({
@@ -433,13 +436,12 @@ function finishExecution(hasError, label) {
 function stopCode() {
   if (!running && !waitingForInput) return;
   worker.terminate();
-  renderOutput({ text: currentOutputText, note: "[사용자가 실행을 중지했습니다]" });
+  renderOutput({ text: currentOutputText, note: "[중지됨]" });
   session = freshSession(editor.getValue().trimEnd());
   running = false;
   waitingForInput = false;
   terminalInputForm.hidden = true;
-  debugMode.textContent = "실행 중지";
-  debugLocation.textContent = "중지됨";
+  debugLocation.textContent = "";
   renderVariables([]);
   updateEditorMarks();
   createWorker();
@@ -455,7 +457,6 @@ function submitTerminalInput(event) {
 function updateEditorMarks(hasError = false) {
   editor.markLine("next", hasError ? null : session.currentLine);
   editor.markLine("error", hasError ? session.currentLine : null);
-  debugStepCount.textContent = `${session.executedCount}줄 실행`;
 }
 
 function revealOutputOnSmallScreen() {
@@ -473,7 +474,7 @@ function renderVariables(items) {
   previousVariables = new Map(items.map((item) => [item.name, item.value]));
 
   if (!items.length) {
-    variables.innerHTML = '<span class="muted">현재 표시할 변수가 없습니다.</span>';
+    variables.innerHTML = '<span class="muted">한 줄 실행하면 여기에 보여요.</span>';
     return;
   }
 
@@ -533,7 +534,7 @@ function loadExample(name) {
     example = `# 불러온 TXT 파일을 read()로 읽습니다\nwith open(${JSON.stringify(textFileName)}, "r", encoding="utf-8") as file:\n    content = file.read()\n\nprint(content)`;
   }
   if (editor.getValue().trim() && editor.getValue() !== example
-    && !window.confirm("작성 중인 코드를 예제로 바꿀까요?\n지금 코드를 남기려면 [취소]를 누른 뒤 [.py 저장]으로 내려받으세요.")) {
+    && !window.confirm("지금 코드를 예제로 바꿀까요?")) {
     return;
   }
   replaceCode(example);
@@ -551,12 +552,9 @@ function setFileName(name) {
 
 function flashSaveStatus(message) {
   saveStatus.textContent = message;
-  saveStatus.classList.add("flash");
+  saveStatus.hidden = false;
   clearTimeout(saveStatusTimer);
-  saveStatusTimer = setTimeout(() => {
-    saveStatus.textContent = "브라우저에 자동 저장됩니다";
-    saveStatus.classList.remove("flash");
-  }, 2500);
+  saveStatusTimer = setTimeout(() => { saveStatus.hidden = true; }, 2000);
 }
 
 function downloadCode() {
@@ -569,7 +567,7 @@ function downloadCode() {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  flashSaveStatus(`${link.download} 파일로 내려받았습니다`);
+  flashSaveStatus(`${link.download} 저장됨`);
 }
 
 async function openPythonFile() {
@@ -577,7 +575,7 @@ async function openPythonFile() {
   pyFileInput.value = "";
   if (!file) return;
   if (file.size > MAX_PYTHON_FILE_SIZE) {
-    renderOutput({ error: `${file.name}: 파일 크기는 1MB 이하여야 합니다.` });
+    renderOutput({ error: `${file.name}: 1MB 이하만 열 수 있어요.` });
     return;
   }
 
@@ -585,14 +583,14 @@ async function openPythonFile() {
   try {
     code = await file.text();
   } catch {
-    renderOutput({ error: `${file.name}: 파일을 읽지 못했습니다.` });
+    renderOutput({ error: `${file.name}: 읽지 못했어요.` });
     return;
   }
 
-  if (editor.getValue().trim() && !window.confirm(`작성 중인 코드를 ${file.name} 내용으로 바꿀까요?`)) return;
+  if (editor.getValue().trim() && !window.confirm(`지금 코드를 ${file.name}(으)로 바꿀까요?`)) return;
   replaceCode(code.replaceAll("\r\n", "\n").replaceAll("\t", "    "));
   setFileName(file.name);
-  renderOutput({ note: `${file.name} 파일을 열었습니다.` });
+  renderOutput({ note: `${file.name} 열림` });
 }
 
 async function loadTextFiles() {
@@ -606,11 +604,11 @@ async function loadTextFiles() {
   for (const file of selectedFiles) {
     const textFileName = file.name.replaceAll("\\", "/").split("/").pop().replaceAll("\0", "");
     if (!textFileName.toLowerCase().endsWith(".txt")) {
-      errors.push(`${file.name}: TXT 파일만 불러올 수 있습니다.`);
+      errors.push(`${file.name}: TXT 파일만 추가할 수 있어요.`);
       continue;
     }
     if (file.size > MAX_TEXT_FILE_SIZE) {
-      errors.push(`${textFileName}: 파일 크기는 5MB 이하여야 합니다.`);
+      errors.push(`${textFileName}: 5MB 이하만 추가할 수 있어요.`);
       continue;
     }
 
@@ -618,7 +616,7 @@ async function loadTextFiles() {
       loadedTextFiles.set(textFileName, await file.text());
       loadedCount += 1;
     } catch {
-      errors.push(`${textFileName}: 파일을 읽지 못했습니다.`);
+      errors.push(`${textFileName}: 읽지 못했어요.`);
     }
   }
 
@@ -626,15 +624,15 @@ async function loadTextFiles() {
   resetDebugSession(editor.getValue().trimEnd(), false);
 
   const note = loadedCount
-    ? `${loadedCount}개의 TXT 파일을 불러왔습니다. Python에서 open("파일명.txt").read()로 읽을 수 있습니다.`
+    ? `TXT ${loadedCount}개 추가됨 · open("파일명.txt")로 읽을 수 있어요.`
     : "";
   renderOutput({ note, error: errors.join("\n") });
 }
 
 function renderLoadedFiles() {
   loadedFilesElement.replaceChildren();
+  fileShelf.hidden = !loadedTextFiles.size;
   if (!loadedTextFiles.size) {
-    loadedFilesElement.append(createSpan("muted", "불러온 TXT 파일이 없습니다."));
     updateControls();
     return;
   }
@@ -677,7 +675,7 @@ function handleShortcut(event) {
     action = runFull;
   } else if (ctrl && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "s") {
     // 습관적으로 누르는 Ctrl+S가 웹페이지 저장 창을 띄우지 않게 합니다.
-    action = () => flashSaveStatus("코드는 자동 저장되었습니다. 파일로 받으려면 [.py 저장]을 누르세요");
+    action = () => flashSaveStatus("자동 저장돼요");
   }
 
   if (!action) return;
@@ -698,6 +696,15 @@ stepButton.addEventListener("click", stepForward);
 cursorButton.addEventListener("click", runToCursor);
 backButton.addEventListener("click", stepBack);
 resetButton.addEventListener("click", () => loadExample("hello"));
+fileMenu.addEventListener("click", (event) => {
+  if (event.target.closest(".menu-list button")) fileMenu.open = false;
+});
+document.addEventListener("click", (event) => {
+  if (fileMenu.open && !fileMenu.contains(event.target)) fileMenu.open = false;
+});
+themeToggle.addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
 exampleSelect.addEventListener("change", () => loadExample(exampleSelect.value));
 fileButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", loadTextFiles);
@@ -710,7 +717,7 @@ loadedFilesElement.addEventListener("click", (event) => {
   loadedTextFiles.delete(removeButton.dataset.fileName);
   renderLoadedFiles();
   resetDebugSession(editor.getValue().trimEnd(), false);
-  renderOutput({ note: "TXT 파일을 제거했습니다." });
+  renderOutput({ note: "TXT 제거됨" });
 });
 terminalInputForm.addEventListener("submit", submitTerminalInput);
 fontSizeDecrease.addEventListener("click", () => applyFontSize(fontSize - 1));
@@ -733,6 +740,8 @@ copyButton.addEventListener("click", async () => {
 
 editor.setValue(localStorage.getItem(STORAGE_KEY) ?? examples.hello);
 setFileName(fileName);
+applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+renderLoadedFiles();
 session = freshSession(editor.getValue().trimEnd());
 applyFontSize(fontSize);
 renderVariables([]);
