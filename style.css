@@ -218,6 +218,10 @@ button:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visib
 .file-remove { align-self: stretch; padding: 0 8px 0 4px; border: 0; color: var(--muted); background: transparent; cursor: pointer; }
 .file-remove:hover:not(:disabled) { color: var(--text); }
 .file-remove:disabled { cursor: not-allowed; opacity: .4; }
+.output-files { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border); border-bottom: 0; }
+.output-files-label { flex: none; color: var(--muted); font-size: .72rem; }
+.file-download { padding: 3px 9px 3px 4px; border: 0; color: var(--accent-line); background: transparent; font-size: .72rem; font-weight: 700; cursor: pointer; }
+.file-download:hover { text-decoration: underline; }
 
 /* 편집기 */
 .editor-wrap { position: relative; min-height: 0; flex: 1; }

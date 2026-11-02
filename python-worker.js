@@ -5,6 +5,8 @@ let mountedTextFileNames = new Set();
 let snapshotSessionId = null;
 let snapshotFiles = new Map();
 
+const MAX_DOWNLOAD_FILE_SIZE = 5 * 1024 * 1024;
+
 const PYTHON_RUNNER = String.raw`
 import builtins as _builtins
 import contextlib as _contextlib
@@ -12,6 +14,7 @@ import inspect as _inspect
 import io as _io
 import json as _json
 import linecache as _linecache
+import os as _os
 import sys as _sys
 import time as _time
 import traceback as _traceback
@@ -265,11 +268,19 @@ _student_builtins["input"] = _classroom_input
 # 학생 코드가 연 파일을 기억했다가 실행이 끝나거나 멈추면 닫습니다.
 # 닫지 않으면 버퍼에 남은 내용이 다음 실행 중에 뒤늦게 기록될 수 있습니다.
 _open_files = []
+_written_files = []
 _original_open = _builtins.open
 
 def _classroom_open(*args, **kwargs):
     file = _original_open(*args, **kwargs)
     _open_files.append(file)
+    # 쓰기·추가 모드로 연 파일은 실행이 끝난 뒤 내려받을 수 있게 이름을 기억합니다.
+    path = args[0] if args else kwargs.get("file")
+    mode = str(args[1] if len(args) > 1 else kwargs.get("mode", "r"))
+    if isinstance(path, (str, bytes)) or hasattr(path, "__fspath__"):
+        name = _os.fsdecode(path)
+        if any(flag in mode for flag in "wax+") and name not in _written_files:
+            _written_files.append(name)
     return file
 
 _student_builtins["open"] = _classroom_open
@@ -334,6 +345,7 @@ for _file in _open_files:
     except BaseException:
         pass
 
+_result["writtenFiles"] = [name for name in _written_files if _os.path.isfile(name)]
 _json.dumps(_result, ensure_ascii=False)
 `;
 
@@ -378,6 +390,7 @@ async function execute(code, inputs = [], request = { mode: "full" }, files = []
 
     const resultJson = await pyodide.runPythonAsync(PYTHON_RUNNER);
     const result = JSON.parse(resultJson);
+    result.writtenFiles = readWrittenFiles(result.writtenFiles);
     self.postMessage({ type: "result", result });
   } catch (error) {
     self.postMessage({ type: "error", message: formatError(error) });
@@ -426,6 +439,19 @@ function listWorkingFiles() {
     if (name === "." || name === "..") return false;
     return pyodide.FS.isFile(pyodide.FS.stat(name).mode);
   });
+}
+
+function readWrittenFiles(names = []) {
+  const files = [];
+  for (const name of names) {
+    try {
+      if (pyodide.FS.stat(name).size > MAX_DOWNLOAD_FILE_SIZE) continue;
+      files.push({ name, data: pyodide.FS.readFile(name) });
+    } catch {
+      // 실행 중에 지워진 파일은 건너뜁니다.
+    }
+  }
+  return files;
 }
 
 function safeTextFileName(value) {

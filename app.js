@@ -46,6 +46,8 @@ const fileShelf = document.querySelector("#file-shelf");
 const fileMenu = document.querySelector("#file-menu");
 const themeToggle = document.querySelector("#theme-toggle");
 const loadedFilesElement = document.querySelector("#loaded-files");
+const outputFiles = document.querySelector("#output-files");
+const writtenFilesElement = document.querySelector("#written-files");
 
 let worker;
 let workerReady = false;
@@ -57,6 +59,8 @@ let fileName = localStorage.getItem(FILE_NAME_STORAGE_KEY) || DEFAULT_FILE_NAME;
 let previousVariables = new Map();
 let saveStatusTimer;
 const loadedTextFiles = new Map();
+// 마지막 실행에서 코드가 쓰기·추가 모드로 연 파일입니다. 이름 → 내용(바이트)
+const writtenFiles = new Map();
 
 // 실행 중 조금씩 도착하는 출력입니다. 한 줄 실행·입력 재개는 처음부터 다시
 // 실행하므로, 이미 화면에 보이던 길이를 넘어설 때만 화면을 바꿉니다.
@@ -196,7 +200,7 @@ function createWorker() {
   workerReady = false;
   setRuntimeState("loading", "준비 중…");
   updateControls();
-  worker = new Worker("./python-worker.js?v=8", { type: "module" });
+  worker = new Worker("./python-worker.js?v=9", { type: "module" });
 
   worker.addEventListener("message", handleWorkerMessage);
   worker.addEventListener("error", (event) => {
@@ -248,6 +252,7 @@ function handleWorkerMessage({ data }) {
 function handleExecutionResult(result) {
   session.started = true;
   renderVariables(result.variables || []);
+  renderWrittenFiles(result.writtenFiles || []);
 
   if (result.status === "input") {
     running = false;
@@ -574,17 +579,53 @@ function flashSaveStatus(message) {
   saveStatusTimer = setTimeout(() => { saveStatus.hidden = true; }, 2000);
 }
 
-function downloadCode() {
-  const blob = new Blob([editor.getValue()], { type: "text/x-python;charset=utf-8" });
+function downloadBlob(blob, downloadName) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = fileName.toLowerCase().endsWith(".py") ? fileName : `${fileName}.py`;
+  link.download = downloadName;
   document.body.append(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  flashSaveStatus(`${link.download} 저장됨`);
+  flashSaveStatus(`${downloadName} 저장됨`);
+}
+
+function downloadCode() {
+  const blob = new Blob([editor.getValue()], { type: "text/x-python;charset=utf-8" });
+  downloadBlob(blob, fileName.toLowerCase().endsWith(".py") ? fileName : `${fileName}.py`);
+}
+
+function downloadWrittenFile(name) {
+  const data = writtenFiles.get(name);
+  if (!data) return;
+  const type = /\.csv$/i.test(name) ? "text/csv" : "text/plain";
+  downloadBlob(new Blob([data], { type }), name.replaceAll("\\", "/").split("/").pop());
+}
+
+function renderWrittenFiles(files) {
+  writtenFiles.clear();
+  for (const { name, data } of files) writtenFiles.set(name, data);
+  writtenFilesElement.replaceChildren();
+  outputFiles.hidden = !writtenFiles.size;
+
+  for (const name of writtenFiles.keys()) {
+    const chip = createSpan("file-chip", "");
+
+    const label = createSpan("file-chip-name", name);
+    label.title = name;
+
+    const downloadButton = document.createElement("button");
+    downloadButton.className = "file-download";
+    downloadButton.type = "button";
+    downloadButton.dataset.fileName = name;
+    downloadButton.title = `${name} 내려받기`;
+    downloadButton.setAttribute("aria-label", `${name} 내려받기`);
+    downloadButton.textContent = "저장";
+
+    chip.append(label, downloadButton);
+    writtenFilesElement.append(chip);
+  }
 }
 
 async function openPythonFile() {
@@ -735,6 +776,10 @@ loadedFilesElement.addEventListener("click", (event) => {
   renderLoadedFiles();
   resetDebugSession(editor.getValue().trimEnd(), false);
   renderOutput({ note: "TXT 제거됨" });
+});
+writtenFilesElement.addEventListener("click", (event) => {
+  const downloadButton = event.target.closest(".file-download");
+  if (downloadButton) downloadWrittenFile(downloadButton.dataset.fileName);
 });
 terminalInputForm.addEventListener("submit", submitTerminalInput);
 fontSizeDecrease.addEventListener("click", () => applyFontSize(fontSize - 1));
